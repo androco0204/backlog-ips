@@ -48,6 +48,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:13
 
 /* METRICS */
 .metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.mc{transition:box-shadow .15s}.mc:hover{box-shadow:0 0 0 2px var(--border2)}
 .mc{background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:14px 16px}
 .mc-lbl{font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-family:var(--mono)}
 .mc-val{font-size:26px;font-weight:600;letter-spacing:-.03em;font-family:var(--mono)}
@@ -814,13 +815,29 @@ function renderMetrics() {
   const crit = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 90 && d > 60; }).length;
   const mod  = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 60 && d > 30; }).length;
   const ok   = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 30; }).length;
+  const legalizados = DATA.filter(r => esLegalizado(r)).length;
   const tot = activos.length || 1;
   document.getElementById('metrics').innerHTML = `
-    <div class="mc"><div class="mc-lbl">Total activos</div><div class="mc-val">${activos.length}</div><div class="mc-sub">Sin legalizar</div></div>
-    <div class="mc"><div class="mc-lbl">Vencidos</div><div class="mc-val red">${venc}</div><div class="mc-sub">${Math.round(venc/tot*100)}% del total</div></div>
-    <div class="mc"><div class="mc-lbl">⚠ Urgentes 0-30d</div><div class="mc-val red">${ok}</div><div class="mc-sub">Vencen muy pronto</div></div>
-    <div class="mc"><div class="mc-lbl">Atención 31-60d</div><div class="mc-val amber">${mod}</div><div class="mc-sub">Vencen pronto</div></div>
-    <div class="mc"><div class="mc-lbl">Seguimiento 61-90d</div><div class="mc-val blue">${crit}</div><div class="mc-sub">Hay tiempo</div></div>`;
+    <div class="mc" style="cursor:pointer" onclick="filtrarEstado('')" title="Ver todos">
+      <div class="mc-lbl">Total registros</div><div class="mc-val">${DATA.length}</div>
+      <div class="mc-sub">${activos.length} activos · ${legalizados} legalizados</div>
+    </div>
+    <div class="mc" style="cursor:pointer" onclick="filtrarEstado('vencido')" title="Ver vencidos">
+      <div class="mc-lbl">Vencidos</div><div class="mc-val red">${venc}</div>
+      <div class="mc-sub">${Math.round(venc/tot*100)}% de activos</div>
+    </div>
+    <div class="mc" style="cursor:pointer" onclick="filtrarEstado('0-30')" title="Ver urgentes">
+      <div class="mc-lbl">⚠ Urgentes 0-30d</div><div class="mc-val red">${ok}</div>
+      <div class="mc-sub">Vencen muy pronto</div>
+    </div>
+    <div class="mc" style="cursor:pointer" onclick="filtrarEstado('31-60')" title="Ver atención">
+      <div class="mc-lbl">Atención 31-60d</div><div class="mc-val amber">${mod}</div>
+      <div class="mc-sub">Vencen pronto</div>
+    </div>
+    <div class="mc" style="cursor:pointer" onclick="filtrarEstado('legalizado')" title="Ver legalizados">
+      <div class="mc-lbl">✓ Legalizados</div><div class="mc-val green">${legalizados}</div>
+      <div class="mc-sub">${Math.round(legalizados/DATA.length*100)}% del total</div>
+    </div>`;
   const ab = document.getElementById('alert-box');
   const msgs = [];
   if (venc > 0) msgs.push(`<div class="alert alert-red">🔴 <strong>${venc} solicitudes vencidas</strong> sin legalizar. Requieren gestión inmediata.</div>`);
@@ -856,13 +873,13 @@ function applyFilters() {
     if (r && row.regional !== r) return false;
     if (e) {
       const d = calcEstadoReal(row.ffin);
-      const grupo = semaforo(d).grupo;
-      if (e === 'vencido' && grupo !== 'vencido') return false;
-      if (e === 'critico' && grupo !== '61-90') return false;
-      if (e === '31-60' && grupo !== '31-60') return false;
-      if (e === '0-30' && grupo !== '0-30') return false;
-      if (e === 'mas-90' && semaforo(calcEstadoReal(row.ffin), esLegalizado(row)).grupo !== 'mas-90') return false;
-      if (e === 'legalizado' && !esLegalizado(row)) return false;
+      const grupo = semaforo(d, esLegalizado(row)).grupo;
+      if (e === 'vencido'   && grupo !== 'vencido')   return false;
+      if (e === '0-30'      && grupo !== '0-30')       return false;
+      if (e === '31-60'     && grupo !== '31-60')      return false;
+      if (e === 'critico'   && grupo !== '61-90')      return false;
+      if (e === 'mas-90'    && grupo !== 'mas-90')     return false;
+      if (e === 'legalizado' && grupo !== 'legalizado') return false;
     }
     return true;
   });
@@ -872,6 +889,12 @@ function applyFilters() {
 function resetFilters() {
   ['f-mod','f-ana','f-reg','f-est'].forEach(id => document.getElementById(id).value = '');
   filtered = [...DATA]; page = 0; renderTable();
+}
+
+function filtrarEstado(grupo) {
+  document.getElementById('f-est').value = grupo;
+  applyFilters();
+  document.getElementById('tab-backlog').scrollIntoView({behavior:'smooth'});
 }
 
 function sortBy(col) {
@@ -1381,7 +1404,7 @@ async function init() {
     renderMetrics();
     renderTable();
     document.getElementById('tb-sub').textContent =
-      `${DATA.length} registros · ${DATA.filter(r=>r.estado!=='Legalizado').length} activos · Actualizado ${new Date().toLocaleTimeString('es-CO')}`;
+      `${DATA.length} registros · ${DATA.filter(r=>!esLegalizado(r)).length} activos · Actualizado ${new Date().toLocaleTimeString('es-CO')}`;
   } catch (err) {
     mostrarError(`Error al conectar con el servidor: ${err.message}`);
     console.error(err);
