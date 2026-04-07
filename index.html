@@ -1253,79 +1253,94 @@ function copiarCorreo() {
 
 // ── RESUMEN EJECUTIVO ──
 function renderResumen() {
-  const venc = DATA.filter(r => r.estado && r.estado.startsWith('Vencidos')).length;
-  const crit = DATA.filter(r => r.estado === '61 - 90 días').length;
-  const m    = DATA.filter(r => r.estado === '31 - 60 días').length;
-  const ok   = DATA.filter(r => r.estado === '0 - 30 días').length;
-  document.getElementById('resumen-fecha').textContent = `Corte: 17 de marzo de 2026 · Generado: ${new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})}`;
+  // Todos los conteos en tiempo real con esLegalizado + calcEstadoReal
+  const activos = DATA.filter(r => !esLegalizado(r));
+  const legalizados = DATA.filter(r => esLegalizado(r)).length;
+  const venc = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d < 0; }).length;
+  const ok   = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 30; }).length;
+  const m    = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d > 30 && d <= 60; }).length;
+  const crit = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d > 60 && d <= 90; }).length;
+  const totAct = activos.length || 1;
 
-  // Alerta
+  document.getElementById('resumen-fecha').textContent =
+    `Generado: ${new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'})} · Total registros: ${DATA.length}`;
+
+  // Alerta principal
   document.getElementById('resumen-alerta').innerHTML = `
     <div class="alerta-icon">⚠</div>
     <div class="alerta-content">
       <h3>${venc + ok} solicitudes requieren acción inmediata</h3>
-      <p>${venc} ya están vencidas sin legalizar y ${ok} vencen en menos de 30 días. Adicionalmente ${m} vencen entre 31 y 60 días y requieren seguimiento activo.</p>
+      <p>${venc} ya están vencidas sin legalizar y ${ok} vencen en menos de 30 días.
+      Adicionalmente ${m} vencen entre 31 y 60 días y requieren seguimiento activo.</p>
     </div>`;
 
   // KPIs
-  const totAct = activos2.length || 1;
   document.getElementById('resumen-kpis').innerHTML = `
-    <div class="rk"><div class="rk-num" style="color:var(--text)">${activos2.length}</div><div class="rk-lbl">Total activos</div></div>
+    <div class="rk"><div class="rk-num" style="color:var(--text)">${activos.length}</div><div class="rk-lbl">Activos sin legalizar</div></div>
     <div class="rk"><div class="rk-num" style="color:var(--red)">${venc}</div><div class="rk-lbl">Vencidos (${Math.round(venc/totAct*100)}%)</div></div>
     <div class="rk"><div class="rk-num" style="color:var(--red)">${ok}</div><div class="rk-lbl">⚠ Urgentes 0-30d</div></div>
-    <div class="rk"><div class="rk-num" style="color:var(--amber)">${m}</div><div class="rk-lbl">Atención 31-60d</div></div>`;
+    <div class="rk"><div class="rk-num" style="color:var(--green)">${legalizados}</div><div class="rk-lbl">✓ Legalizados</div></div>`;
 
-  // Estado bars
+  // Barras de distribución por estado (tiempo real)
   const estados = [
-    {lbl:'Vencidos acum.',val:venc,color:'var(--red)'},
-    {lbl:'Críticos 61-90d',val:crit,color:'var(--amber)'},
-    {lbl:'31-60 días',val:m,color:'var(--blue)'},
-    {lbl:'0-30 días',val:ok,color:'var(--green)'}
+    {lbl:'Vencidos',val:venc,color:'var(--red)'},
+    {lbl:'Urgentes 0-30d',val:ok,color:'#e05c2a'},
+    {lbl:'Atención 31-60d',val:m,color:'var(--amber)'},
+    {lbl:'Seguimiento 61-90d',val:crit,color:'var(--blue)'},
+    {lbl:'Legalizados',val:legalizados,color:'var(--green)'}
   ];
-  const maxE = Math.max(...estados.map(e=>e.val));
+  const maxE = Math.max(...estados.map(e=>e.val), 1);
   document.getElementById('resumen-estado-bars').innerHTML = estados.map(e =>
     `<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-      <div style="width:130px;font-size:12px;color:var(--text)">${e.lbl}</div>
+      <div style="width:150px;font-size:12px;color:var(--text);flex-shrink:0">${e.lbl}</div>
       <div style="flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden">
         <div style="width:${Math.round(e.val/maxE*100)}%;height:100%;background:${e.color};border-radius:5px"></div>
       </div>
-      <div style="font-size:12px;color:var(--text2);font-family:var(--mono);min-width:30px;text-align:right">${e.val}</div>
+      <div style="font-size:12px;color:var(--text2);font-family:var(--mono);min-width:36px;text-align:right">${e.val}</div>
     </div>`).join('');
 
-  // Analistas
-  const carga = {};
-  DATA.forEach(r => { if(r.analista) carga[r.analista]=(carga[r.analista]||0)+1; });
-  document.getElementById('resumen-analistas').innerHTML = Object.entries(carga).sort((a,b)=>b[1]-a[1]).map(([name,cnt]) => {
-    const c = ACOLORS[name]||'#888';
-    const ini = (name.split(' ')[0][0]+(name.split(' ')[1]?name.split(' ')[1][0]:'')).toUpperCase();
-    const v = DATA.filter(r=>r.analista===name&&r.estado&&r.estado.startsWith('Vencidos')).length;
-    const cr = DATA.filter(r=>r.analista===name&&r.estado==='61 - 90 días').length;
-    return `<div class="resumen-analista-row">
-      <div class="ra-name">
-        <div style="width:28px;height:28px;border-radius:50%;background:${c}18;color:${c};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;font-family:var(--mono);flex-shrink:0">${ini}</div>
-        ${name}
-      </div>
-      <div class="ra-stats">
-        <span style="color:var(--text2)">${cnt} activas</span>
-        ${v?`<span style="color:var(--red)">${v} vencidas</span>`:''}
-        ${cr?`<span style="color:var(--amber)">${cr} críticas</span>`:''}
-      </div>
-    </div>`;
-  }).join('');
+  // Carga y vencidos por analista (tiempo real)
+  const analistas = [...new Set(DATA.map(r=>r.analista).filter(Boolean))];
+  document.getElementById('resumen-analistas').innerHTML = analistas
+    .map(name => {
+      const rows = DATA.filter(r => r.analista === name);
+      const actA = rows.filter(r => !esLegalizado(r));
+      const vA = actA.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d < 0; }).length;
+      const urgA = actA.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 30; }).length;
+      return {name, total: actA.length, vencidos: vA, urgentes: urgA};
+    })
+    .sort((a,b) => b.total - a.total)
+    .map(({name, total, vencidos, urgentes}) => {
+      const c = ACOLORS[name]||'#888';
+      const ini = (name.split(' ')[0][0]+(name.split(' ')[1]?name.split(' ')[1][0]:'')).toUpperCase();
+      return `<div class="resumen-analista-row">
+        <div class="ra-name">
+          <div style="width:28px;height:28px;border-radius:50%;background:${c}18;color:${c};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;font-family:var(--mono);flex-shrink:0">${ini}</div>
+          ${name}
+        </div>
+        <div class="ra-stats">
+          <span style="color:var(--text2)">${total} activas</span>
+          ${vencidos?`<span style="color:var(--red)">${vencidos} vencidas</span>`:''}
+          ${urgentes?`<span style="color:#e05c2a">${urgentes} urgentes</span>`:''}
+        </div>
+      </div>`;
+    }).join('');
 
-  // Regionales
+  // Activos por regional (tiempo real)
   const regs = {};
-  DATA.forEach(r=>{if(r.regional)regs[r.regional]=(regs[r.regional]||0)+1;});
-  const maxR = Math.max(...Object.values(regs));
+  DATA.filter(r => !esLegalizado(r)).forEach(r => { if(r.regional) regs[r.regional]=(regs[r.regional]||0)+1; });
+  const maxR = Math.max(...Object.values(regs), 1);
   const rcols = ['#185fa8','#7c3aed','#0f6e56','#b7760c','#c0392b','#0e7490','#2d7a3a','#5f5e5a'];
-  document.getElementById('resumen-regionales').innerHTML = Object.entries(regs).sort((a,b)=>b[1]-a[1]).map(([reg,cnt],i) =>
-    `<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-      <div style="width:120px;font-size:12px;color:var(--text)">${reg}</div>
-      <div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
-        <div style="width:${Math.round(cnt/maxR*100)}%;height:100%;background:${rcols[i%rcols.length]};border-radius:4px"></div>
-      </div>
-      <div style="font-size:11px;color:var(--text2);font-family:var(--mono);min-width:25px;text-align:right">${cnt}</div>
-    </div>`).join('');
+  document.getElementById('resumen-regionales').innerHTML = Object.entries(regs)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([reg,cnt],i) =>
+      `<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <div style="width:130px;font-size:12px;color:var(--text);flex-shrink:0">${reg}</div>
+        <div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+          <div style="width:${Math.round(cnt/maxR*100)}%;height:100%;background:${rcols[i%rcols.length]};border-radius:4px"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text2);font-family:var(--mono);min-width:25px;text-align:right">${cnt}</div>
+      </div>`).join('');
 }
 
 function copiarResumen() {
