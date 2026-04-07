@@ -240,10 +240,12 @@ tr:hover td{background:var(--bg)}
     <div class="filter-sep"></div>
     <label>Estado</label>
     <select id="f-est" onchange="applyFilters()">
-      <option value="">Todos</option>
-      <option value="vencido">Solo vencidos</option>
-      <option value="critico">Críticos 61-90d</option>
-      <option value="normal">En tiempo</option>
+      <option value="">Todos los estados</option>
+      <option value="vencido">🔴 Vencidos</option>
+      <option value="critico">🟡 Críticos 61-90d</option>
+      <option value="31-60">🔵 31-60 días</option>
+      <option value="0-30">🟢 0-30 días (recientes)</option>
+      <option value="legalizado">✓ Legalizados</option>
     </select>
     <div class="filter-sep"></div>
     <button class="btn btn-outline btn-sm" onclick="resetFilters()">Limpiar</button>
@@ -738,17 +740,23 @@ let filtered = [], page = 0;
 const PER = 15;
 
 function diasRestantes(fechaFin) {
-  if (!fechaFin) return null;
-  return Math.round((new Date(fechaFin) - TODAY) / (1000*60*60*24));
+  return calcEstadoReal(fechaFin);
 }
 
-function semaforo(dias, estado) {
-  if (estado && estado.startsWith('Vencidos')) return {sem:'sem-r', pill:'pill-r', label: estado};
-  if (dias === null) return {sem:'', pill:'pill-gray', label:'—'};
-  if (dias < 0) return {sem:'sem-r', pill:'pill-r', label: Math.abs(dias)+'d vencido'};
-  if (dias <= 30) return {sem:'sem-g', pill:'pill-g', label: dias+'d restantes'};
-  if (dias <= 60) return {sem:'sem-b', pill:'pill-b', label: dias+'d restantes'};
-  return {sem:'sem-a', pill:'pill-a', label: dias+'d restantes'};
+// Estado calculado siempre en tiempo real a partir de FECHA_FIN_MODELO
+function calcEstadoReal(fechaFin) {
+  if (!fechaFin || fechaFin === '') return null;
+  const dias = Math.round((new Date(fechaFin) - TODAY) / (1000*60*60*24));
+  return dias;
+}
+
+function semaforo(dias) {
+  if (dias === null) return {sem:'', pill:'pill-gray', label:'Sin fecha', grupo:'sin-fecha'};
+  if (dias < 0)   return {sem:'sem-r', pill:'pill-r', label: Math.abs(dias)+'d vencido', grupo:'vencido'};
+  if (dias <= 30)  return {sem:'sem-g', pill:'pill-g', label: dias+'d restantes', grupo:'0-30'};
+  if (dias <= 60)  return {sem:'sem-b', pill:'pill-b', label: dias+'d restantes', grupo:'31-60'};
+  if (dias <= 90)  return {sem:'sem-a', pill:'pill-a', label: dias+'d restantes', grupo:'61-90'};
+  return {sem:'sem-a', pill:'pill-gray', label: dias+'d restantes', grupo:'mas-90'};
 }
 
 function nextID(mod) {
@@ -788,10 +796,11 @@ function calcFechaFin() {
 });
 
 function renderMetrics() {
-  const venc = DATA.filter(r => r.estado && r.estado.startsWith('Vencidos')).length;
-  const crit = DATA.filter(r => r.estado === '61 - 90 días').length;
-  const mod  = DATA.filter(r => r.estado === '31 - 60 días').length;
-  const ok   = DATA.filter(r => r.estado === '0 - 30 días').length;
+  const activos = DATA.filter(r => r.estado !== 'Legalizado');
+  const venc = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d < 0; }).length;
+  const crit = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 90 && d > 60; }).length;
+  const mod  = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 60 && d > 30; }).length;
+  const ok   = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 30; }).length;
   document.getElementById('metrics').innerHTML = `
     <div class="mc"><div class="mc-lbl">Total activos</div><div class="mc-val">${DATA.length}</div><div class="mc-sub">Sin legalizar</div></div>
     <div class="mc"><div class="mc-lbl">Vencidos</div><div class="mc-val red">${venc}</div><div class="mc-sub">${Math.round(venc/DATA.length*100)}% del total</div></div>
@@ -799,10 +808,12 @@ function renderMetrics() {
     <div class="mc"><div class="mc-lbl">31-60 días</div><div class="mc-val blue">${mod}</div><div class="mc-sub">En seguimiento</div></div>
     <div class="mc"><div class="mc-lbl">0-30 días</div><div class="mc-val green">${ok}</div><div class="mc-sub">Recientes</div></div>`;
   const ab = document.getElementById('alert-box');
-  if (crit > 0) ab.innerHTML = `<div class="alert alert-amber">⚠ <strong>${crit} solicitudes</strong> están en zona crítica (61-90 días). Requieren atención prioritaria para evitar nuevos vencimientos.</div>`;
-  else ab.innerHTML = '';
+  const msgs = [];
+  if (venc > 0) msgs.push(`<div class="alert alert-red">🔴 <strong>${venc} solicitudes vencidas</strong> sin legalizar. Requieren gestión inmediata.</div>`);
+  if (crit > 0) msgs.push(`<div class="alert alert-amber">⚠ <strong>${crit} solicitudes</strong> en zona crítica (61-90 días). Requieren atención prioritaria.</div>`);
+  ab.innerHTML = msgs.join('');
   // notif badge
-  const total_alerta = DATA.filter(r => { const d = diasRestantes(r.ffin); return d !== null && d >= 0 && d <= 30; }).length;
+  const total_alerta = DATA.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 30; }).length;
   const nb = document.getElementById('notif-badge');
   nb.textContent = total_alerta > 0 ? total_alerta : '';
   document.getElementById('tb-sub').textContent = `${DATA.length} solicitudes activas · Corte 17 mar 2026`;
@@ -828,9 +839,15 @@ function applyFilters() {
     if (m && row.modalidad !== m) return false;
     if (a && row.analista !== a) return false;
     if (r && row.regional !== r) return false;
-    if (e === 'vencido' && !(row.estado && row.estado.startsWith('Vencidos'))) return false;
-    if (e === 'critico' && row.estado !== '61 - 90 días') return false;
-    if (e === 'normal' && !['0 - 30 días','31 - 60 días'].includes(row.estado)) return false;
+    if (e) {
+      const d = calcEstadoReal(row.ffin);
+      const grupo = semaforo(d).grupo;
+      if (e === 'vencido' && grupo !== 'vencido') return false;
+      if (e === 'critico' && grupo !== '61-90') return false;
+      if (e === '31-60' && grupo !== '31-60') return false;
+      if (e === '0-30' && grupo !== '0-30') return false;
+      if (e === 'legalizado' && row.estado !== 'Legalizado') return false;
+    }
     return true;
   });
   page = 0; renderTable();
@@ -850,8 +867,8 @@ function sortBy(col) {
   if (el) el.textContent = sortAsc ? ' ↑' : ' ↓';
   // Sort filtered
   filtered.sort((a, b) => {
-    let va = col === '_dias' ? (diasRestantes(a.ffin) ?? 9999) : (a[col] || '');
-    let vb = col === '_dias' ? (diasRestantes(b.ffin) ?? 9999) : (b[col] || '');
+    let va = col === '_dias' ? (calcEstadoReal(a.ffin) ?? 9999) : (a[col] || '');
+    let vb = col === '_dias' ? (calcEstadoReal(b.ffin) ?? 9999) : (b[col] || '');
     if (col === 'ffin') { va = va || '9999'; vb = vb || '9999'; }
     const cmp = String(va).localeCompare(String(vb), 'es', {numeric: true});
     return sortAsc ? cmp : -cmp;
@@ -864,8 +881,8 @@ function renderTable() {
   const start = page * PER;
   const slice = filtered.slice(start, start + PER);
   document.getElementById('tbl').innerHTML = slice.map(r => {
-    const dias = diasRestantes(r.ffin);
-    const s = semaforo(dias, r.estado);
+    const dias = calcEstadoReal(r.ffin);
+    const s = semaforo(dias);
     const diasStr = dias === null ? '—' : (dias < 0 ? `<span style="color:var(--red);font-family:var(--mono);font-size:11px">${Math.abs(dias)}d</span>` : `<span style="font-family:var(--mono);font-size:11px">${dias}d</span>`);
     const color = ACOLORS[r.analista] || '#888';
     const ini = r.analista ? (r.analista.split(' ')[0][0]+(r.analista.split(' ')[1]?r.analista.split(' ')[1][0]:'')).toUpperCase() : '?';
@@ -903,7 +920,7 @@ function changePage(d) { page += d; renderTable(); }
 function openModal(id) {
   const r = DATA.find(x => x.id === id);
   if (!r) return;
-  const dias = diasRestantes(r.ffin);
+  const dias = calcEstadoReal(r.ffin);
   const s = semaforo(dias, r.estado);
   document.getElementById('modal-title').textContent = r.ips || r.id;
   document.getElementById('modal-sub').textContent = `${r.id} · ${r.modalidad} · ${r.regional}`;
@@ -1144,17 +1161,18 @@ function limpiarForm() {
 function renderNotif() {
   const limitDias = parseInt(document.getElementById('alert-dias').value);
   const alertas = DATA.filter(r => {
-    const d = diasRestantes(r.ffin);
+    if (r.estado === 'Legalizado') return false;
+    const d = calcEstadoReal(r.ffin);
     return d !== null && d >= 0 && d <= limitDias;
-  }).sort((a,b) => diasRestantes(a.ffin) - diasRestantes(b.ffin));
+  }).sort((a,b) => (calcEstadoReal(a.ffin)||0) - (calcEstadoReal(b.ffin)||0));
   const list = document.getElementById('notif-list');
   if (!alertas.length) {
     list.innerHTML='<div style="font-size:12px;color:var(--text3);padding:12px 0;font-family:var(--mono)">✓ No hay solicitudes próximas a vencer en el umbral seleccionado.</div>';
     return;
   }
   list.innerHTML = alertas.map(r => {
-    const d = diasRestantes(r.ffin);
-    const s = semaforo(d, r.estado);
+    const d = calcEstadoReal(r.ffin);
+    const s = semaforo(d);
     const color = ACOLORS[r.analista]||'#888';
     return `<div class="notif-item">
       <div class="notif-info">
@@ -1271,14 +1289,15 @@ function renderResumen() {
 }
 
 function copiarResumen() {
-  const venc = DATA.filter(r=>r.estado&&r.estado.startsWith('Vencidos')).length;
-  const crit = DATA.filter(r=>r.estado==='61 - 90 días').length;
-  const m    = DATA.filter(r=>r.estado==='31 - 60 días').length;
-  const ok   = DATA.filter(r=>r.estado==='0 - 30 días').length;
+  const activos2 = DATA.filter(r => r.estado !== 'Legalizado');
+  const venc = activos2.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d < 0; }).length;
+  const crit = activos2.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 90 && d > 60; }).length;
+  const m    = activos2.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 60 && d > 30; }).length;
+  const ok   = activos2.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 30; }).length;
   const carga = {};
   DATA.forEach(r=>{if(r.analista)carga[r.analista]=(carga[r.analista]||0)+1;});
   const txt = `RESUMEN EJECUTIVO — BACKLOG DE PARAMETRIZACIÓN IPS
-Fecha de corte: 17 de marzo de 2026
+Fecha de generación: ${new Date().toLocaleDateString('es-CO', {day:'2-digit',month:'long',year:'numeric'})}
 
 INDICADORES GENERALES
 ──────────────────────────────
