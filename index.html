@@ -252,14 +252,14 @@ tr:hover td{background:var(--bg)}
     <table>
       <thead><tr>
         <th style="width:14px"></th>
-        <th style="width:110px">ID Solicitud</th>
-        <th style="width:68px">Modalidad</th>
-        <th style="width:95px">Regional</th>
-        <th style="width:170px">IPS / Prestador</th>
-        <th style="width:125px">Analista</th>
-        <th style="width:90px">Fecha fin</th>
-        <th style="width:80px">Días rest.</th>
-        <th style="width:95px">Estado</th>
+        <th style="width:110px;cursor:pointer" onclick="sortBy('id')">ID Solicitud <span id="sort-id"></span></th>
+        <th style="width:68px;cursor:pointer" onclick="sortBy('modalidad')">Modalidad <span id="sort-modalidad"></span></th>
+        <th style="width:95px;cursor:pointer" onclick="sortBy('regional')">Regional <span id="sort-regional"></span></th>
+        <th style="width:170px;cursor:pointer" onclick="sortBy('ips')">IPS / Prestador <span id="sort-ips"></span></th>
+        <th style="width:125px;cursor:pointer" onclick="sortBy('analista')">Analista <span id="sort-analista"></span></th>
+        <th style="width:90px;cursor:pointer" onclick="sortBy('ffin')">Fecha fin <span id="sort-ffin"></span></th>
+        <th style="width:80px;cursor:pointer" onclick="sortBy('_dias')">Días rest. <span id="sort-_dias"></span></th>
+        <th style="width:95px;cursor:pointer" onclick="sortBy('estado')">Estado <span id="sort-estado"></span></th>
         <th style="width:70px">CDN/Docs</th>
         <th style="width:60px">Detalle</th>
       </tr></thead>
@@ -571,7 +571,7 @@ tr:hover td{background:var(--bg)}
       <div style="font-size:12px;color:var(--text2);margin-top:3px;font-family:var(--mono)" id="resumen-fecha"></div>
     </div>
     <div class="export-actions">
-      <button class="btn btn-outline" onclick="copiarResumen()">Copiar texto</button>
+      <button class="btn btn-outline" onclick="copiarResumen()" title="Copia el resumen ejecutivo al portapapeles para pegarlo en un correo o documento">📋 Copiar resumen para correo</button>
       <button class="btn btn-dark" onclick="window.print()">Imprimir / PDF</button>
     </div>
   </div>
@@ -637,6 +637,7 @@ const AREGIONAL = {
 };
 
 let ID_COUNTERS = { 'EVENTO': 1, 'DIF. EVENTO': 1 };
+let sortCol = null, sortAsc = true;
 
 // ── CAPA DE API ───────────────────────────────────────────────
 // Apps Script redirige a una URL temporal — debemos seguir esa redirección.
@@ -811,8 +812,10 @@ function populateFilters() {
   const anas = [...new Set(DATA.map(r => r.analista).filter(Boolean))].sort();
   const regs = [...new Set(DATA.map(r => r.regional).filter(Boolean))].sort();
   const fa = document.getElementById('f-ana');
-  anas.forEach(a => { const o = document.createElement('option'); o.value = a; o.textContent = a; fa.appendChild(o); });
   const fr = document.getElementById('f-reg');
+  fa.innerHTML = '<option value="">Todos</option>';
+  fr.innerHTML = '<option value="">Todas</option>';
+  anas.forEach(a => { const o = document.createElement('option'); o.value = a; o.textContent = a; fa.appendChild(o); });
   regs.forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; fr.appendChild(o); });
 }
 
@@ -836,6 +839,25 @@ function applyFilters() {
 function resetFilters() {
   ['f-mod','f-ana','f-reg','f-est'].forEach(id => document.getElementById(id).value = '');
   filtered = [...DATA]; page = 0; renderTable();
+}
+
+function sortBy(col) {
+  if (sortCol === col) { sortAsc = !sortAsc; }
+  else { sortCol = col; sortAsc = true; }
+  // Update header indicators
+  document.querySelectorAll('th span[id^="sort-"]').forEach(s => s.textContent = '');
+  const el = document.getElementById('sort-' + col);
+  if (el) el.textContent = sortAsc ? ' ↑' : ' ↓';
+  // Sort filtered
+  filtered.sort((a, b) => {
+    let va = col === '_dias' ? (diasRestantes(a.ffin) ?? 9999) : (a[col] || '');
+    let vb = col === '_dias' ? (diasRestantes(b.ffin) ?? 9999) : (b[col] || '');
+    if (col === 'ffin') { va = va || '9999'; vb = vb || '9999'; }
+    const cmp = String(va).localeCompare(String(vb), 'es', {numeric: true});
+    return sortAsc ? cmp : -cmp;
+  });
+  page = 0;
+  renderTable();
 }
 
 function renderTable() {
