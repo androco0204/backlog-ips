@@ -219,14 +219,95 @@ tr:hover td{background:var(--bg)}
 
 <!-- TABS -->
 <div class="tabs-bar">
-  <div class="tab active" onclick="switchTab('backlog')">Backlog</div>
-  <div class="tab" onclick="switchTab('analistas')">Carga analistas</div>
-  <div class="tab" onclick="switchTab('notif')">Notificaciones <span id="notif-badge" style="background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;font-family:var(--mono);margin-left:4px"></span></div>
-  <div class="tab" onclick="switchTab('resumen')">Resumen ejecutivo</div>
+  <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+  <div class="tab" onclick="switchTab('backlog')">📋 Backlog</div>
+  <div class="tab" onclick="switchTab('analistas')">👥 Analistas</div>
+  <div class="tab" onclick="switchTab('notif')">🔔 Notificaciones <span id="notif-badge" style="background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;font-family:var(--mono);margin-left:4px"></span></div>
+  <div class="tab" onclick="switchTab('resumen')">📄 Resumen</div>
+</div>
+
+
+<!-- ═══════════════════════ DASHBOARD ═══════════════════════ -->
+<div id="tab-dashboard" class="panel active">
+
+  <!-- Filtros globales dashboard -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 16px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+    <label style="font-size:11px;font-weight:600;color:var(--text2);font-family:var(--mono)">FILTROS</label>
+    <select id="d-regional" onchange="renderDashboard()" style="font-size:12px;padding:5px 10px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg);color:var(--text)">
+      <option value="">Todas las regionales</option>
+    </select>
+    <select id="d-modalidad" onchange="renderDashboard()" style="font-size:12px;padding:5px 10px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg);color:var(--text)">
+      <option value="">Todas las modalidades</option>
+      <option value="EVENTO">Evento</option>
+      <option value="DIF. EVENTO">Diferente a Evento</option>
+    </select>
+    <select id="d-periodo" onchange="renderDashboard()" style="font-size:12px;padding:5px 10px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg);color:var(--text)">
+      <option value="">Todos los períodos</option>
+      <option value="30">Últimos 30 días</option>
+      <option value="90">Últimos 90 días</option>
+      <option value="180">Últimos 180 días</option>
+      <option value="365">Último año</option>
+    </select>
+    <button onclick="resetDashboardFilters()" style="font-size:12px;padding:5px 12px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer">Limpiar</button>
+    <button onclick="exportarExcelDashboard()" style="font-size:12px;padding:5px 12px;border-radius:var(--r);border:1px solid var(--border2);background:var(--text);color:#fff;cursor:pointer;margin-left:auto">↓ Exportar Excel</button>
+  </div>
+
+  <!-- KPIs rápidos -->
+  <div id="d-kpis" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px"></div>
+
+  <!-- Alerta dashboard -->
+  <div id="d-alerta" style="margin-bottom:14px"></div>
+
+  <!-- Fila 1: Dona modalidad + Barras por estado -->
+  <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:14px;margin-bottom:14px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;font-family:var(--mono)">Distribución por modalidad</div>
+      <div style="position:relative;height:200px"><canvas id="ch-modalidad"></canvas></div>
+      <div id="ch-modalidad-legend" style="display:flex;gap:16px;justify-content:center;margin-top:10px;font-size:11px;color:var(--text2)"></div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;font-family:var(--mono)">Estado de urgencia (tiempo real)</div>
+      <div style="position:relative;height:200px"><canvas id="ch-estado"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Fila 2: Barras por regional + Top ciudades -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;font-family:var(--mono)">Activos por regional</div>
+      <div id="d-regional-bars"></div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-family:var(--mono)">Top ciudades con más solicitudes activas</div>
+      <div id="d-top-ciudades"></div>
+    </div>
+  </div>
+
+  <!-- Fila 3: Tabla resumen vencimientos -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:16px;margin-bottom:14px">
+    <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;font-family:var(--mono)">Cuadro resumen de vencimientos por regional</div>
+    <div style="overflow-x:auto">
+      <table id="d-tabla-venc" style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--bg)">
+            <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);font-family:var(--mono)">Regional</th>
+            <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);font-family:var(--mono)">Vencidos</th>
+            <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:600;color:#e05c2a;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);font-family:var(--mono)">Urgentes 0-30d</th>
+            <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);font-family:var(--mono)">Atención 31-60d</th>
+            <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);font-family:var(--mono)">Seguim. 61-90d</th>
+            <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);font-family:var(--mono)">Legalizados</th>
+            <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);font-family:var(--mono)">Total</th>
+          </tr>
+        </thead>
+        <tbody id="d-tabla-venc-body"></tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 
 <!-- ═══════════════════════════════ BACKLOG ═══════════════════════════════ -->
-<div id="tab-backlog" class="panel active">
+<div id="tab-backlog" class="panel">
   <div class="metrics" id="metrics"></div>
   <div id="alert-box"></div>
   <div class="filters">
@@ -251,6 +332,7 @@ tr:hover td{background:var(--bg)}
     </select>
     <div class="filter-sep"></div>
     <button class="btn btn-outline btn-sm" onclick="resetFilters()">Limpiar</button>
+    <button class="btn btn-outline btn-sm" onclick="exportarExcelBacklog()" style="margin-left:auto">↓ Exportar Excel</button>
   </div>
   <div class="tbl-wrap">
     <table>
@@ -1379,15 +1461,259 @@ Acción urgente de legalización requerida.`;
 }
 
 // ── TABS ──
+
+// ═══════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════
+let chartModalidad = null, chartEstado = null;
+
+function getDashboardData() {
+  const regional  = document.getElementById('d-regional')?.value  || '';
+  const modalidad = document.getElementById('d-modalidad')?.value || '';
+  const periodo   = document.getElementById('d-periodo')?.value   || '';
+  return DATA.filter(r => {
+    if (regional  && r.regional  !== regional)  return false;
+    if (modalidad && r.modalidad !== modalidad) return false;
+    if (periodo) {
+      const fp = r.fparam || r.fechaFin || '';
+      if (fp) {
+        const diff = Math.round((TODAY - new Date(fp)) / (1000*60*60*24));
+        if (diff > parseInt(periodo)) return false;
+      }
+    }
+    return true;
+  });
+}
+
+function populateDashboardFilters() {
+  const regs = [...new Set(DATA.map(r => r.regional).filter(Boolean))].sort();
+  const sel = document.getElementById('d-regional');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Todas las regionales</option>';
+  regs.forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; sel.appendChild(o); });
+}
+
+function resetDashboardFilters() {
+  ['d-regional','d-modalidad','d-periodo'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const data = getDashboardData();
+  const activos    = data.filter(r => !esLegalizado(r));
+  const legalizados = data.filter(r => esLegalizado(r)).length;
+  const venc = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d < 0; }).length;
+  const urg  = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 30; }).length;
+  const m30  = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d > 30 && d <= 60; }).length;
+  const m60  = activos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d > 60 && d <= 90; }).length;
+  const totAct = activos.length || 1;
+
+  // KPIs
+  document.getElementById('d-kpis').innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:14px 16px">
+      <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-family:var(--mono)">Total registros</div>
+      <div style="font-size:24px;font-weight:600;font-family:var(--mono)">${data.length}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:3px">${activos.length} activos · ${legalizados} legalizados</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:14px 16px;cursor:pointer" onclick="filtrarEstado('vencido')">
+      <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-family:var(--mono)">Vencidos</div>
+      <div style="font-size:24px;font-weight:600;font-family:var(--mono);color:var(--red)">${venc}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:3px">${Math.round(venc/totAct*100)}% de activos</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:14px 16px;cursor:pointer" onclick="filtrarEstado('0-30')">
+      <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-family:var(--mono)">⚠ Urgentes 0-30d</div>
+      <div style="font-size:24px;font-weight:600;font-family:var(--mono);color:#e05c2a">${urg}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:3px">Legalizar a la brevedad</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:14px 16px;cursor:pointer" onclick="filtrarEstado('31-60')">
+      <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-family:var(--mono)">Atención 31-60d</div>
+      <div style="font-size:24px;font-weight:600;font-family:var(--mono);color:var(--amber)">${m30}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:3px">Hacer seguimiento</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:14px 16px;cursor:pointer" onclick="filtrarEstado('legalizado')">
+      <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-family:var(--mono)">✓ Legalizados</div>
+      <div style="font-size:24px;font-weight:600;font-family:var(--mono);color:var(--green)">${legalizados}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:3px">${Math.round(legalizados/data.length*100)}% del total</div>
+    </div>`;
+
+  // Alerta
+  const da = document.getElementById('d-alerta');
+  if (venc + urg > 0) {
+    da.innerHTML = `<div style="background:var(--red-bg);border:1px solid var(--red-bd);border-radius:var(--r);padding:10px 16px;font-size:12px;color:var(--red);display:flex;align-items:center;gap:8px">
+      🔴 <strong>${venc} vencidas</strong> sin legalizar y <strong>${urg} urgentes</strong> (vencen en menos de 30 días). Acción inmediata requerida.</div>`;
+  } else da.innerHTML = '';
+
+  // Gráfico dona modalidad
+  const evtCount = data.filter(r => r.modalidad === 'EVENTO').length;
+  const difCount = data.filter(r => r.modalidad === 'DIF. EVENTO').length;
+  if (chartModalidad) chartModalidad.destroy();
+  const ctxM = document.getElementById('ch-modalidad');
+  if (ctxM) {
+    chartModalidad = new Chart(ctxM, {
+      type: 'doughnut',
+      data: {
+        labels: ['Evento', 'Dif. Evento'],
+        datasets: [{ data: [evtCount, difCount], backgroundColor: ['#185fa8','#7c3aed'], borderWidth: 0, hoverOffset: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: ctx => ` ${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw/data.length*100)}%)`
+        }}}
+      }
+    });
+    document.getElementById('ch-modalidad-legend').innerHTML = `
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#185fa8;display:inline-block"></span>Evento: ${evtCount}</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#7c3aed;display:inline-block"></span>Dif. Evento: ${difCount}</span>`;
+  }
+
+  // Gráfico barras estado urgencia
+  if (chartEstado) chartEstado.destroy();
+  const ctxE = document.getElementById('ch-estado');
+  if (ctxE) {
+    chartEstado = new Chart(ctxE, {
+      type: 'bar',
+      data: {
+        labels: ['Vencidos', 'Urgentes 0-30d', 'Atención 31-60d', 'Seguim. 61-90d', 'Legalizados'],
+        datasets: [{ data: [venc, urg, m30, m60, legalizados],
+          backgroundColor: ['#c0392b','#e05c2a','#b7760c','#1a5fa8','#2d7a3a'],
+          borderRadius: 4, borderSkipped: false }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+          y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 10 }, stepSize: 1 } }
+        }
+      }
+    });
+  }
+
+  // Barras por regional
+  const regs = {};
+  activos.forEach(r => { if (r.regional) regs[r.regional] = (regs[r.regional]||0)+1; });
+  const sortedRegs = Object.entries(regs).sort((a,b)=>b[1]-a[1]);
+  const maxR = sortedRegs[0]?.[1] || 1;
+  const rcols = ['#185fa8','#7c3aed','#0f6e56','#b7760c','#c0392b','#0e7490','#2d7a3a','#5f5e5a'];
+  document.getElementById('d-regional-bars').innerHTML = sortedRegs.map(([reg,cnt],i) => `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="width:120px;font-size:11px;color:var(--text);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${reg}">${reg}</div>
+      <div style="flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden">
+        <div style="width:${Math.round(cnt/maxR*100)}%;height:100%;background:${rcols[i%rcols.length]};border-radius:5px"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);font-family:var(--mono);min-width:28px;text-align:right">${cnt}</div>
+    </div>`).join('');
+
+  // Top 10 ciudades
+  const ciudades = {};
+  activos.forEach(r => { if (r.ciudad) ciudades[r.ciudad] = (ciudades[r.ciudad]||0)+1; });
+  const topCiudades = Object.entries(ciudades).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const maxC = topCiudades[0]?.[1] || 1;
+  document.getElementById('d-top-ciudades').innerHTML = topCiudades.map(([ciu,cnt],i) => `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <div style="width:16px;height:16px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;font-family:var(--mono);color:var(--text2);flex-shrink:0">${i+1}</div>
+      <div style="width:110px;font-size:11px;color:var(--text);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${ciu}">${ciu}</div>
+      <div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+        <div style="width:${Math.round(cnt/maxC*100)}%;height:100%;background:#185fa8;border-radius:4px"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);font-family:var(--mono);min-width:24px;text-align:right">${cnt}</div>
+    </div>`).join('');
+
+  // Tabla resumen vencimientos por regional
+  const allRegs = [...new Set(data.map(r=>r.regional).filter(Boolean))].sort();
+  const tbody = document.getElementById('d-tabla-venc-body');
+  if (tbody) {
+    const rows = allRegs.map(reg => {
+      const rData = data.filter(r => r.regional === reg);
+      const rActivos = rData.filter(r => !esLegalizado(r));
+      const rv   = rActivos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d < 0; }).length;
+      const ru   = rActivos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d >= 0 && d <= 30; }).length;
+      const rm   = rActivos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d > 30 && d <= 60; }).length;
+      const rc   = rActivos.filter(r => { const d = calcEstadoReal(r.ffin); return d !== null && d > 60 && d <= 90; }).length;
+      const rl   = rData.filter(r => esLegalizado(r)).length;
+      const urgStyle = (rv+ru>0) ? 'background:#fff5f5' : '';
+      return `<tr style="${urgStyle};border-bottom:1px solid var(--border)">
+        <td style="padding:8px 12px;font-size:12px;font-weight:500;color:var(--text)">${reg}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:600;color:${rv>0?'var(--red)':'var(--text3)'}">${rv||'—'}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:600;color:${ru>0?'#e05c2a':'var(--text3)'}">${ru||'—'}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:12px;color:${rm>0?'var(--amber)':'var(--text3)'}">${rm||'—'}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:12px;color:${rc>0?'var(--blue)':'var(--text3)'}">${rc||'—'}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:12px;color:var(--green)">${rl||'—'}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:600;font-family:var(--mono)">${rData.length}</td>
+      </tr>`;
+    });
+    // Totals row
+    const tv = activos.filter(r=>{const d=calcEstadoReal(r.ffin);return d!==null&&d<0}).length;
+    const tu = activos.filter(r=>{const d=calcEstadoReal(r.ffin);return d!==null&&d>=0&&d<=30}).length;
+    const tm = activos.filter(r=>{const d=calcEstadoReal(r.ffin);return d!==null&&d>30&&d<=60}).length;
+    const tc = activos.filter(r=>{const d=calcEstadoReal(r.ffin);return d!==null&&d>60&&d<=90}).length;
+    const tl = data.filter(r=>esLegalizado(r)).length;
+    rows.push(`<tr style="background:var(--bg);border-top:2px solid var(--border2)">
+      <td style="padding:8px 12px;font-size:12px;font-weight:700;font-family:var(--mono)">TOTAL</td>
+      <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700;color:var(--red)">${tv}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700;color:#e05c2a">${tu}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700;color:var(--amber)">${tm}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700;color:var(--blue)">${tc}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700;color:var(--green)">${tl}</td>
+      <td style="padding:8px 12px;text-align:center;font-size:12px;font-weight:700;font-family:var(--mono)">${data.length}</td>
+    </tr>`);
+    tbody.innerHTML = rows.join('');
+  }
+}
+
+// ── Exportar Excel desde dashboard ───────────────────────────
+function exportarExcelDashboard() {
+  const data = getDashboardData();
+  const regional  = document.getElementById('d-regional')?.value  || 'Todas';
+  const modalidad = document.getElementById('d-modalidad')?.value || 'Todas';
+  exportarExcel(data, `Backlog_${regional}_${modalidad}_${new Date().toISOString().split('T')[0]}`);
+}
+
+// ── Exportar Excel genérico (SheetJS) ────────────────────────
+function exportarExcel(rows, nombreArchivo) {
+  // Construir CSV como fallback (SheetJS no disponible en CDN permitido)
+  const cols = [
+    'ID_SISTEMA','ID_ORIGINAL','MODALIDAD','REGIONAL','CIUDAD','NIT','NOMBRE_IPS',
+    'FORMA_CONTRATACION','TIPO_ESTUDIO','ANALISTA_PARAMETRIZA','FECHA_PARAMETRIZACION',
+    'FECHA_INICIO_MODELO','FECHA_FIN_MODELO','FECHA_LEGALIZACION','ESTADO_REAL',
+    'DIAS_RESTANTES','RESULTADO_COMITE','RETROACTIVIDAD','OBSERVACION_PARAMETRICA'
+  ];
+  const header = cols.join(',');
+  const csvRows = rows.map(r => {
+    const dias = calcEstadoReal(r.ffin);
+    const est  = semaforo(dias, esLegalizado(r)).label;
+    return [
+      r.id, r.idOriginal, r.modalidad, r.regional, r.ciudad, r.nit, `"${(r.ips||'').replace(/"/g,'""')}"`,
+      r.contrato, r.tipoest, r.analista, r.fparam, r.finicio, r.ffin, r.fLegaliza,
+      est, dias ?? '', r.rescomite, r.retro, `"${(r.obs||'').replace(/"/g,'""')}"`
+    ].join(',');
+  });
+  const csv = '﻿' + header + '\n' + csvRows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = nombreArchivo + '.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Exportar desde backlog (filtered)
+function exportarExcelBacklog() {
+  exportarExcel(filtered, `Backlog_detalle_${new Date().toISOString().split('T')[0]}`);
+}
+
 function switchTab(name) {
-  const names = ['backlog','analistas','notif','resumen'];
+  const names = ['dashboard','backlog','analistas','notif','resumen'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('tab-'+name);
   if (panel) panel.classList.add('active');
-  if (name==='analistas') renderAnalistas();
-  if (name==='notif') renderNotif();
-  if (name==='resumen') renderResumen();
+  if (name==='dashboard')  renderDashboard();
+  if (name==='analistas')  renderAnalistas();
+  if (name==='notif')      renderNotif();
+  if (name==='resumen')    renderResumen();
 }
 
 function openNueva() {
@@ -1416,8 +1742,10 @@ async function init() {
       if (!isNaN(num) && num >= ID_COUNTERS[mod]) ID_COUNTERS[mod] = num + 1;
     });
     populateFilters();
+    populateDashboardFilters();
     renderMetrics();
     renderTable();
+    renderDashboard();
     document.getElementById('tb-sub').textContent =
       `${DATA.length} registros · ${DATA.filter(r=>!esLegalizado(r)).length} activos · Actualizado ${new Date().toLocaleTimeString('es-CO')}`;
   } catch (err) {
@@ -1429,5 +1757,6 @@ async function init() {
 init();
 
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </body>
 </html>
