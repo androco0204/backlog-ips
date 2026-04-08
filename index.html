@@ -1,3 +1,23 @@
+<!-- ══════════ PANTALLA DE CARGA / LOGIN ══════════ -->
+<div id="pantalla-carga" style="position:fixed;inset:0;background:#f5f4f0;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:20px">
+  <div style="text-align:center">
+    <div style="width:56px;height:56px;background:#1a1917;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+      <svg viewBox="0 0 18 18" fill="none" width="28" height="28"><rect x="2" y="2" width="6" height="6" rx="1.5" fill="#fff"/><rect x="10" y="2" width="6" height="6" rx="1.5" fill="#fff"/><rect x="2" y="10" width="6" height="6" rx="1.5" fill="#fff"/><rect x="10" y="10" width="6" height="6" rx="1.5" fill="#d0cfc8"/></svg>
+    </div>
+    <div style="font-size:20px;font-weight:600;color:#1a1917;letter-spacing:-.02em;font-family:'IBM Plex Sans',sans-serif">Backlog de Parametrización IPS</div>
+    <div id="login-sub" style="font-size:13px;color:#6b6a66;margin-top:8px;font-family:'IBM Plex Mono',monospace">Verificando acceso...</div>
+  </div>
+  <div id="login-form" style="display:none;background:#fff;border:1px solid rgba(0,0,0,0.1);border-radius:12px;padding:28px 32px;width:360px;text-align:center">
+    <div style="font-size:13px;color:#6b6a66;margin-bottom:16px">Ingresa tu correo corporativo para continuar</div>
+    <input type="email" id="login-email" placeholder="tucorreo@empresa.com"
+      style="width:100%;padding:10px 14px;border-radius:6px;border:1px solid rgba(0,0,0,0.18);font-size:13px;font-family:'IBM Plex Sans',sans-serif;margin-bottom:10px;box-sizing:border-box">
+    <button onclick="verificarAcceso()" style="width:100%;padding:10px;background:#1a1917;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:'IBM Plex Sans',sans-serif">Ingresar</button>
+    <div id="login-error" style="font-size:12px;color:#c0392b;margin-top:10px;display:none"></div>
+  </div>
+  <div id="login-spinner" style="width:32px;height:32px;border:3px solid rgba(0,0,0,0.1);border-top-color:#1a1917;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -224,6 +244,7 @@ tr:hover td{background:var(--bg)}
   <div class="tab" onclick="switchTab('analistas')">👥 Analistas</div>
   <div class="tab" onclick="switchTab('notif')">🔔 Notificaciones <span id="notif-badge" style="background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;font-family:var(--mono);margin-left:4px"></span></div>
   <div class="tab" onclick="switchTab('resumen')">📄 Resumen</div>
+  <div class="tab" id="tab-config-btn" style="display:none" onclick="switchTab('config')">⚙ Configuración</div>
 </div>
 
 
@@ -1462,6 +1483,182 @@ Acción urgente de legalización requerida.`;
 
 // ── TABS ──
 
+
+// ════════════════════════════════════════════════════════════
+// AUTENTICACIÓN Y PERFILAMIENTO
+// ════════════════════════════════════════════════════════════
+let USUARIO_ACTUAL = null;
+let CONFIG_SISTEMA = {};
+
+async function verificarAcceso() {
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) return;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  document.getElementById('login-sub').textContent = 'Verificando...';
+  try {
+    const resp = await apiGet(`verificarUsuario&email=${encodeURIComponent(email)}`);
+    if (!resp.ok) {
+      errEl.textContent = resp.error || 'Acceso denegado';
+      errEl.style.display = 'block';
+      document.getElementById('login-sub').textContent = 'Verifica tu correo e intenta de nuevo';
+      return;
+    }
+    USUARIO_ACTUAL = resp.usuario;
+    await cargarSistema();
+  } catch(err) {
+    errEl.textContent = 'Error de conexión: ' + err.message;
+    errEl.style.display = 'block';
+  }
+}
+
+async function cargarSistema() {
+  document.getElementById('login-spinner').style.display = 'block';
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('login-sub').textContent = 'Cargando datos...';
+
+  try {
+    // Cargar configuración
+    const cfgResp = await apiGet('getConfig');
+    if (cfgResp.ok) CONFIG_SISTEMA = cfgResp.data;
+
+    // Cargar datos
+    const dataResp = await apiGet('getAll');
+    if (dataResp.error) throw new Error(dataResp.error);
+    DATA = dataResp.data.map(normalizar);
+
+    // Aplicar filtro de perfil
+    aplicarFiltroPerfil();
+
+    filtered = [...DATA];
+    populateFilters();
+    populateDashboardFilters();
+    renderMetrics();
+    renderTable();
+    renderDashboard();
+
+    // Actualizar UI con info del usuario
+    const nombreProyecto = CONFIG_SISTEMA.nombre_proyecto || 'Backlog de Parametrización IPS';
+    document.querySelector('.tb-title').textContent = nombreProyecto;
+    document.getElementById('tb-sub').textContent =
+      `${DATA.length} registros · ${DATA.filter(r=>!esLegalizado(r)).length} activos · ${USUARIO_ACTUAL.nombre} (${USUARIO_ACTUAL.perfil})`;
+
+    // Mostrar pestaña config solo a administradores
+    if (USUARIO_ACTUAL.perfil === 'ADMINISTRADOR') {
+      document.getElementById('tab-config-btn').style.display = 'block';
+    }
+
+    // Ocultar pantalla de carga
+    document.getElementById('pantalla-carga').style.display = 'none';
+
+  } catch(err) {
+    document.getElementById('login-sub').textContent = 'Error: ' + err.message;
+    document.getElementById('login-spinner').style.display = 'none';
+    document.getElementById('login-form').style.display = 'block';
+  }
+}
+
+function aplicarFiltroPerfil() {
+  if (!USUARIO_ACTUAL) return;
+  // Analista: solo ve sus propias solicitudes
+  if (USUARIO_ACTUAL.perfil === 'ANALISTA' && !USUARIO_ACTUAL.todasRegionales) {
+    DATA = DATA.filter(r =>
+      USUARIO_ACTUAL.regionales.includes(r.regional) ||
+      r.analista === USUARIO_ACTUAL.nombre
+    );
+  }
+  // Coordinador: ve su regional
+  if (USUARIO_ACTUAL.perfil === 'COORDINADOR' && !USUARIO_ACTUAL.todasRegionales) {
+    DATA = DATA.filter(r => USUARIO_ACTUAL.regionales.includes(r.regional));
+  }
+  // Administrador: ve todo
+}
+
+// ════════════════════════════════════════════════════════════
+// CONFIGURACIÓN DINÁMICA
+// ════════════════════════════════════════════════════════════
+const CONFIG_LABELS = {
+  nombre_proyecto:          'Nombre del proyecto',
+  email_administrador:      'Correo administrador',
+  emails_alertas:           'Correos de alertas (separados por coma)',
+  dia_correo_semanal:       'Día envío semanal (LUNES/MARTES/...)',
+  hora_correo_semanal:      'Hora envío semanal (0-23)',
+  dia_correo_mensual:       'Día del mes envío mensual (1-28)',
+  hora_correo_mensual:      'Hora envío mensual (0-23)',
+  umbral_urgente_dias:      'Días umbral URGENTE (rojo)',
+  umbral_atencion_dias:     'Días umbral ATENCIÓN (amarillo)',
+  umbral_seguimiento_dias:  'Días umbral SEGUIMIENTO (azul)',
+  dias_temporalidad_maxima: 'Días máximos temporalidad',
+  correo_activo:            'Correos automáticos activos (SI/NO)',
+};
+
+function renderConfig() {
+  const form = document.getElementById('config-form');
+  if (!form) return;
+  form.innerHTML = Object.entries(CONFIG_LABELS).map(([key, label]) => `
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;font-family:var(--mono)">${label}</label>
+      <input type="text" id="cfg-${key}" value="${CONFIG_SISTEMA[key]||''}"
+        style="padding:7px 10px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--sans)">
+    </div>`).join('');
+
+  // Cargar analistas
+  renderAnalistasConfig();
+}
+
+async function guardarConfiguracion() {
+  const params = {};
+  Object.keys(CONFIG_LABELS).forEach(key => {
+    const el = document.getElementById('cfg-' + key);
+    if (el) params[key] = el.value.trim();
+  });
+  try {
+    const resp = await apiPost({ action: 'guardarConfig', params, usuario: USUARIO_ACTUAL });
+    if (resp.ok) {
+      CONFIG_SISTEMA = { ...CONFIG_SISTEMA, ...params };
+      const m = document.getElementById('config-msg');
+      m.textContent = '✓ Configuración guardada correctamente';
+      setTimeout(() => m.textContent = '', 3000);
+    }
+  } catch(err) {
+    alert('Error al guardar: ' + err.message);
+  }
+}
+
+async function renderAnalistasConfig() {
+  try {
+    const resp = await apiGet('getAnalistas');
+    if (!resp.ok) return;
+    const lista = document.getElementById('analistas-lista');
+    if (!lista) return;
+    lista.innerHTML = resp.data.map(a => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px">
+        <div>
+          <div style="font-weight:500;color:var(--text)">${a.NOMBRE}</div>
+          <div style="color:var(--text3);font-size:10px;font-family:var(--mono)">${a.CORREO} · ${a.PERFIL}</div>
+        </div>
+        <span style="font-size:10px;padding:2px 8px;border-radius:12px;background:${a.ACTIVO==='SI'?'var(--green-bg)':'var(--red-bg)'};color:${a.ACTIVO==='SI'?'var(--green)':'var(--red)'};font-family:var(--mono)">${a.ACTIVO==='SI'?'Activo':'Inactivo'}</span>
+      </div>`).join('');
+  } catch(err) {}
+}
+
+function abrirFormAnalista() {
+  const correo = prompt('Correo del usuario:');
+  if (!correo) return;
+  const nombre = prompt('Nombre completo:');
+  if (!nombre) return;
+  const perfil = prompt('Perfil (ADMINISTRADOR/COORDINADOR/ANALISTA/SOLO_LECTURA):') || 'ANALISTA';
+  const regionales = prompt('Regionales (separadas por coma, o TODAS):') || 'TODAS';
+  apiPost({ action: 'guardarAnalista', data: {
+    CORREO: correo, NOMBRE: nombre.toUpperCase(), PERFIL: perfil.toUpperCase(),
+    REGIONALES: regionales.toUpperCase(), COLOR_HEX: '#888', ACTIVO: 'SI',
+    FECHA_CREACION: new Date().toISOString().split('T')[0]
+  }, usuario: USUARIO_ACTUAL }).then(resp => {
+    if (resp.ok) { alert('✓ ' + resp.mensaje); renderAnalistasConfig(); }
+    else alert('Error: ' + resp.error);
+  });
+}
+
 // ═══════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════
@@ -1705,7 +1902,7 @@ function exportarExcelBacklog() {
 }
 
 function switchTab(name) {
-  const names = ['dashboard','backlog','analistas','notif','resumen'];
+  const names = ['dashboard','backlog','analistas','notif','resumen','config'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('tab-'+name);
@@ -1714,6 +1911,7 @@ function switchTab(name) {
   if (name==='analistas')  renderAnalistas();
   if (name==='notif')      renderNotif();
   if (name==='resumen')    renderResumen();
+  if (name==='config')     renderConfig();
 }
 
 function openNueva() {
@@ -1726,37 +1924,51 @@ function closeNueva() {
 document.getElementById('alert-dias').addEventListener('change', renderNotif);
 document.addEventListener('keydown', e => { if(e.key==='Escape'){ closeModal(); closeNueva(); } });
 
-// ── INIT: carga datos desde el Sheet ─────────────────────────
-async function init() {
-  mostrarCargando('Conectando con Google Sheets...');
-  try {
-    const resp = await apiGet('getAll');
-    if (resp.error) throw new Error(resp.error);
-    DATA = resp.data.map(normalizar);
-    filtered = [...DATA];
-    // Actualizar contadores de ID
-    DATA.forEach(r => {
-      const mod = r.modalidad === 'EVENTO' ? 'EVENTO' : 'DIF. EVENTO';
-      const parts = (r.id || '').split('-');
-      const num = parseInt(parts[parts.length - 1]);
-      if (!isNaN(num) && num >= ID_COUNTERS[mod]) ID_COUNTERS[mod] = num + 1;
+// ── INIT: mostrar login ──────────────────────────────────────
+function init() {
+  // Mostrar formulario de login después de un breve delay
+  setTimeout(() => {
+    document.getElementById('login-spinner').style.display = 'none';
+    document.getElementById('login-form').style.display = 'block';
+    document.getElementById('login-sub').textContent = 'Ingresa tu correo para acceder';
+    document.getElementById('login-email').addEventListener('keydown', e => {
+      if (e.key === 'Enter') verificarAcceso();
     });
-    populateFilters();
-    populateDashboardFilters();
-    renderMetrics();
-    renderTable();
-    renderDashboard();
-    document.getElementById('tb-sub').textContent =
-      `${DATA.length} registros · ${DATA.filter(r=>!esLegalizado(r)).length} activos · Actualizado ${new Date().toLocaleTimeString('es-CO')}`;
-  } catch (err) {
-    mostrarError(`Error al conectar con el servidor: ${err.message}`);
-    console.error(err);
-  }
+  }, 800);
 }
 
 init();
 
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<!-- ══════════ CONFIGURACIÓN ══════════ -->
+<div id="tab-config" class="panel">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <!-- Parámetros del sistema -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:20px">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px;font-family:var(--mono);border-bottom:1px solid var(--border);padding-bottom:10px">Parámetros del sistema</div>
+      <div style="display:flex;flex-direction:column;gap:12px" id="config-form"></div>
+      <button onclick="guardarConfiguracion()" style="margin-top:16px;padding:8px 18px;background:var(--text);color:#fff;border:none;border-radius:var(--r);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--sans)">Guardar configuración</button>
+      <div id="config-msg" style="font-size:11px;margin-top:8px;color:var(--green)"></div>
+    </div>
+
+    <!-- Gestión de analistas -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:20px">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px;font-family:var(--mono);border-bottom:1px solid var(--border);padding-bottom:10px">Usuarios y perfiles</div>
+      <div id="analistas-lista" style="max-height:400px;overflow-y:auto"></div>
+      <button onclick="abrirFormAnalista()" style="margin-top:12px;padding:7px 14px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r);font-size:12px;cursor:pointer;font-family:var(--sans)">+ Agregar usuario</button>
+    </div>
+
+  </div>
+
+  <!-- Log de accesos -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:20px;margin-top:16px">
+    <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;font-family:var(--mono)">Actividad reciente del sistema</div>
+    <div id="log-lista" style="font-size:11px;color:var(--text2);font-family:var(--mono)">Cargando log...</div>
+  </div>
+</div>
+
 </body>
 </html>
