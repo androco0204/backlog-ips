@@ -1,22 +1,48 @@
-<!-- ══════════ PANTALLA DE CARGA / LOGIN ══════════ -->
-<div id="pantalla-carga" style="position:fixed;inset:0;background:#f5f4f0;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:20px">
-  <div style="text-align:center">
-    <div style="width:56px;height:56px;background:#1a1917;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-      <svg viewBox="0 0 18 18" fill="none" width="28" height="28"><rect x="2" y="2" width="6" height="6" rx="1.5" fill="#fff"/><rect x="10" y="2" width="6" height="6" rx="1.5" fill="#fff"/><rect x="2" y="10" width="6" height="6" rx="1.5" fill="#fff"/><rect x="10" y="10" width="6" height="6" rx="1.5" fill="#d0cfc8"/></svg>
+<!-- ══════════ PANTALLA LOGIN KERALTY ══════════ -->
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes kFadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.lcard{animation:kFadeUp .5s ease forwards}
+</style>
+<div id="pantalla-carga" style="position:fixed;inset:0;background:linear-gradient(150deg,#F0F6FA 0%,#D0DFE9 100%);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column">
+
+  <div style="position:fixed;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#003D53 0%,#0069A7 50%,#0099D1 100%)"></div>
+
+  <div class="lcard" style="background:#fff;border-radius:20px;padding:48px 40px 40px;width:400px;text-align:center;box-shadow:0 8px 48px rgba(0,61,83,0.15),0 1px 4px rgba(0,61,83,0.06);border:1px solid rgba(0,153,209,0.18)">
+
+    <img src="data:image/png;base64,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RERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERF//2Q==" alt="EPS Sanitas"
+      style="height:56px;object-fit:contain;margin-bottom:22px;filter:brightness(0) saturate(100%) invert(8%) sepia(80%) saturate(1800%) hue-rotate(172deg) brightness(90%) contrast(105%)">
+
+    <div style="width:44px;height:3px;background:linear-gradient(90deg,#0069A7,#0099D1);border-radius:2px;margin:0 auto 22px"></div>
+
+    <div style="font-size:19px;font-weight:700;color:#003D53;font-family:'Figtree',sans-serif;margin-bottom:4px;letter-spacing:-.01em">Backlog de Parametrización</div>
+    <div style="font-size:13px;color:#0069A7;font-family:'Figtree',sans-serif;margin-bottom:28px;font-weight:500">Sistema de gestión de solicitudes IPS</div>
+
+    <div id="login-sub" style="font-size:12px;color:#0099D1;margin-bottom:20px;font-family:'Figtree',sans-serif">Verificando acceso...</div>
+
+    <div id="login-form" style="display:none">
+      <div style="font-size:13px;color:#5f7f8f;margin-bottom:14px;font-family:'Figtree',sans-serif">Ingresa tu correo corporativo para continuar</div>
+      <input type="email" id="login-email" placeholder="tucorreo@sanitas.com.co"
+        style="width:100%;padding:12px 14px;border-radius:8px;border:1.5px solid #B1CADA;font-size:13px;font-family:'Figtree',sans-serif;margin-bottom:12px;box-sizing:border-box;color:#003D53;outline:none;transition:border-color .2s;background:#F8FBFD"
+        onfocus="this.style.borderColor='#0099D1';this.style.background='#fff'"
+        onblur="this.style.borderColor='#B1CADA';this.style.background='#F8FBFD'">
+      <button onclick="verificarAcceso()"
+        style="width:100%;padding:12px;background:#003D53;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Figtree',sans-serif;letter-spacing:.02em;transition:background .2s"
+        onmouseover="this.style.background='#0069A7'"
+        onmouseout="this.style.background='#003D53'">
+        Ingresar
+      </button>
+      <div id="login-error" style="font-size:12px;color:#B50303;margin-top:10px;display:none;font-family:'Figtree',sans-serif;background:#FFEEE8;padding:8px 12px;border-radius:6px"></div>
     </div>
-    <div style="font-size:20px;font-weight:600;color:#1a1917;letter-spacing:-.02em;font-family:'IBM Plex Sans',sans-serif">Backlog de Parametrización IPS</div>
-    <div id="login-sub" style="font-size:13px;color:#6b6a66;margin-top:8px;font-family:'IBM Plex Mono',monospace">Verificando acceso...</div>
+
+    <div id="login-spinner" style="width:32px;height:32px;border:3px solid #E6F1FA;border-top-color:#0099D1;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto"></div>
   </div>
-  <div id="login-form" style="display:none;background:#fff;border:1px solid rgba(0,0,0,0.1);border-radius:12px;padding:28px 32px;width:360px;text-align:center">
-    <div style="font-size:13px;color:#6b6a66;margin-bottom:16px">Ingresa tu correo corporativo para continuar</div>
-    <input type="email" id="login-email" placeholder="tucorreo@empresa.com"
-      style="width:100%;padding:10px 14px;border-radius:6px;border:1px solid rgba(0,0,0,0.18);font-size:13px;font-family:'IBM Plex Sans',sans-serif;margin-bottom:10px;box-sizing:border-box">
-    <button onclick="verificarAcceso()" style="width:100%;padding:10px;background:#1a1917;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:'IBM Plex Sans',sans-serif">Ingresar</button>
-    <div id="login-error" style="font-size:12px;color:#c0392b;margin-top:10px;display:none"></div>
+
+  <div style="margin-top:20px;font-size:11px;color:#0069A7;font-family:'Figtree',sans-serif;opacity:.75;letter-spacing:.02em">
+    © 2026 Keralty · EPS Sanitas · Colsanitas · Uso interno
   </div>
-  <div id="login-spinner" style="width:32px;height:32px;border:3px solid rgba(0,0,0,0.1);border-top-color:#1a1917;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+
 </div>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <!DOCTYPE html>
 <html lang="es">
@@ -24,7 +50,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Backlog Parametrización IPS</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#f5f4f0;--surface:#fff;--surface2:#eeecea;
@@ -42,18 +68,18 @@
 body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:13px;min-height:100vh}
 
 /* TOPBAR */
-.topbar{background:var(--text);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:100}
+.topbar{background:#fff;color:var(--text);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:100;border-bottom:3px solid #0099D1;box-shadow:0 2px 12px rgba(0,61,83,0.10)}
 .tb-brand{display:flex;align-items:center;gap:12px}
 .tb-logo{width:34px;height:34px;background:#fff;border-radius:7px;display:flex;align-items:center;justify-content:center}
 .tb-logo svg{width:18px;height:18px}
-.tb-title{font-size:15px;font-weight:600;letter-spacing:-.02em}
-.tb-sub{font-size:11px;color:rgba(255,255,255,.5);margin-top:2px;font-family:var(--mono)}
+.tb-title{font-size:15px;font-weight:700;letter-spacing:-.02em;color:#003D53;font-family:"Figtree",sans-serif}
+.tb-sub{font-size:11px;color:#0069A7;margin-top:2px;font-family:var(--mono)}
 .tb-actions{display:flex;gap:8px;align-items:center}
 .btn{padding:6px 14px;border-radius:var(--r);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--sans);transition:all .15s;border:1px solid transparent;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
-.btn-ghost{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.2)}
-.btn-ghost:hover{background:rgba(255,255,255,.2)}
-.btn-white{background:#fff;color:var(--text)}.btn-white:hover{background:#f0efeb}
-.btn-dark{background:var(--text);color:#fff;border-color:var(--text)}.btn-dark:hover{background:#333}
+.btn-ghost{background:#E6F1FA;color:#003D53;border-color:#B0D3F0}
+.btn-ghost:hover{background:#B0D3F0}
+.btn-white{background:#003D53;color:#fff;border-color:#003D53}.btn-white:hover{background:#0069A7}
+.btn-dark{background:#003D53;color:#fff;border-color:#003D53}.btn-dark:hover{background:#0069A7}
 .btn-outline{background:transparent;color:var(--text);border-color:var(--border2)}.btn-outline:hover{background:var(--surface2)}
 .btn-red{background:var(--red-bg);color:var(--red);border-color:var(--red-bd)}.btn-red:hover{background:#fde0db}
 .btn-sm{padding:4px 10px;font-size:11px}
@@ -61,7 +87,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:13
 /* TABS */
 .tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:0;position:sticky;top:62px;z-index:90}
 .tab{padding:11px 18px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;user-select:none;white-space:nowrap}
-.tab:hover{color:var(--text)}.tab.active{color:var(--text);border-bottom-color:var(--text)}
+.tab:hover{color:#0069A7}.tab.active{color:#003D53;border-bottom-color:#0099D1;font-weight:600}
 
 /* PANELS */
 .panel{display:none;padding:20px 24px}.panel.active{display:block}
@@ -72,7 +98,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:13
 .mc{background:var(--surface);border:1px solid var(--border);border-radius:var(--rlg);padding:14px 16px}
 .mc-lbl{font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-family:var(--mono)}
 .mc-val{font-size:26px;font-weight:600;letter-spacing:-.03em;font-family:var(--mono)}
-.mc-val.red{color:var(--red)}.mc-val.amber{color:var(--amber)}.mc-val.blue{color:var(--blue)}.mc-val.green{color:var(--green)}
+.mc-val.red{color:#B50303}.mc-val.amber{color:#865400}.mc-val.blue{color:#0069A7}.mc-val.green{color:#2E7300}
 .mc-sub{font-size:10px;color:var(--text3);margin-top:3px}
 
 /* ALERTS */
@@ -222,12 +248,12 @@ tr:hover td{background:var(--bg)}
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="tb-brand">
-    <div class="tb-logo">
-      <svg viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="6" height="6" rx="1.5" fill="#1a1917"/><rect x="10" y="2" width="6" height="6" rx="1.5" fill="#1a1917"/><rect x="2" y="10" width="6" height="6" rx="1.5" fill="#1a1917"/><rect x="10" y="10" width="6" height="6" rx="1.5" fill="#d0cfc8"/></svg>
-    </div>
+    <img src="data:image/png;base64,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RERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERF//2Q==" alt="EPS Sanitas"
+      style="height:34px;object-fit:contain;margin-right:12px;filter:brightness(0) saturate(100%) invert(8%) sepia(80%) saturate(1800%) hue-rotate(172deg) brightness(90%) contrast(105%)">
+    <div style="width:1px;height:30px;background:#B1CADA;margin-right:14px;flex-shrink:0"></div>
     <div>
       <div class="tb-title">Backlog de Parametrización IPS</div>
-      <div class="tb-sub" id="tb-sub">Corte 17 mar 2026 · Evento + Diferente a Evento</div>
+      <div class="tb-sub" id="tb-sub">Cargando...</div>
     </div>
   </div>
   <div class="tb-actions">
