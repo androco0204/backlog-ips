@@ -1549,9 +1549,18 @@ async function cargarSistema() {
     const cfgResp = await apiGet('getConfig');
     if (cfgResp.ok) CONFIG_SISTEMA = cfgResp.data;
 
-    // Cargar datos
-    const dataResp = await apiGet('getAll');
-    if (dataResp.error) throw new Error(dataResp.error);
+    // Cargar datos en lote — getAll puede ser grande
+    // Intentar primero, si falla usar paginación
+    let dataResp;
+    try {
+      dataResp = await apiGet('getAll');
+      if (dataResp.error) throw new Error(dataResp.error);
+    } catch(e) {
+      // Si getAll falla por tamaño, intentar getActivos
+      document.getElementById('login-sub').textContent = 'Cargando registros activos...';
+      dataResp = await apiGet('getActivos');
+      if (dataResp.error) throw new Error(dataResp.error);
+    }
     DATA = dataResp.data.map(normalizar);
 
     // Aplicar filtro de perfil
